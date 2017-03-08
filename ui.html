@@ -1,0 +1,433 @@
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>VUE-CRUD-UI</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.1.10/vue.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/2.2.1/vue-router.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.15.3/axios.js"></script>
+  <script src="../lib/php_crud_api_transform.js"></script>
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap-theme.min.css">
+</head>
+<body>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-3">
+      <h3>VUE-CRUD-UI</h3>
+    </div>
+  </div>
+  <main id="app">
+    <div class="row">
+      <div class="col-md-3">
+        <menu-component v-if="definition!==null" :subjects="definition.tags"></menu-component>
+      </div>
+      <div class="col-md-9">
+        <router-view v-if="definition!==null" :paths="definition.paths"></router-view>
+      </div>
+    </div>
+  </main>
+</div>
+
+<template id="menu">
+  <div>
+    <ul v-if="subjects!==null" class="nav nav-pills nav-stacked">
+      <router-link v-for="subject in subjects" tag="li" v-bind:to="{name: 'List', params: {subject: subject.name}}">
+        <a>{{ subject.name }}</a>
+      </router-link>
+    </ul
+  </div>
+</template>
+
+<template id="overview">
+</template>
+
+<template id="list">
+  <div>
+    <h2>{{ subject }}: list</h2>
+    <div class="actions">
+      <router-link class="btn btn-default" v-bind:to="{name: 'Add', params: {subject: subject}}">
+        <span class="glyphicon glyphicon-plus"></span>
+        Add
+      </router-link>
+    </div>
+    <p v-if="data===null">
+    </p>
+    <table v-else class="table">
+      <thead>
+        <tr>
+          <th v-for="value in data[subject]['columns']">{{ value }}</th>
+          <th v-if="related">related</th>
+          <th>actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="record in data[subject]['records']">
+          <template v-for="(value, key, index) in record">
+            <td v-if="references[key] !== false">
+              <router-link v-bind:to="{name: 'View', params: {subject: references[key][0], id: value}}">{{ referenceText(references[key][0], references[key][1], value) }}</router-link>
+            </td>
+            <td v-else>{{ value }}</td>
+          </template>
+          <td>
+            <template v-for="(relations, i) in referenced">
+              <template v-for="(relation, j) in relations">
+                <router-link v-bind:to="{name: 'List', params: {subject: relation[0]}}">{{ relation[0] }}</router-link>
+              </template>
+            </template>
+          </td>
+          <td>
+            <router-link class="btn btn-default" v-bind:to="{name: 'View', params: {subject: subject, id: record[primaryKey]}}">View</router-link>
+            <router-link class="btn btn-default" v-bind:to="{name: 'Edit', params: {subject: subject, id: record[primaryKey]}}">Edit</router-link>
+            <router-link class="btn btn-default" v-bind:to="{name: 'Delete', params: {subject: subject, id: record[primaryKey]}}">Delete</router-link>
+         </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<template id="add">
+  <div>
+    <h2>Add</h2>
+    <form v-on:submit="createpost">
+      <div class="form-group">
+        <label for="add-content">Content</label>
+        <textarea class="form-control" id="add-content" rows="10" v-model="post.content"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Create</button>
+      <router-link class="btn btn-default" v-bind:to="'/'">Cancel</router-link>
+    </form>
+  </div>
+</template>
+
+<template id="view">
+  <div>
+    <p v-if="data===null">Loading...</p>
+    <dl v-else>
+      <template v-for="(value, key) in data">
+       <dt>{{ key }} </dt>
+        <dd>{{ value }}</dd>
+      </template>
+    </dl>
+    <br/>
+    <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
+    <router-link v-bind:to="'/'">Back to list</router-link>
+  </div>
+</template>
+
+<template id="edit">
+  <div>
+    <h2>Edit post</h2>
+    <form v-on:submit="updatepost">
+      <div class="form-group">
+        <label for="edit-content">Content</label>
+        <textarea class="form-control" id="edit-content" rows="3" v-model="post.content"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Save</button>
+      <router-link class="btn btn-default" v-bind:to="'/'">Cancel</router-link>
+    </form>
+  </div>
+</template>
+
+<template id="delete">
+  <div>
+    <h2>Delete #{{ record.id }}</h2>
+    <form v-on:submit="deletepost">
+      <p>The action cannot be undone.</p>
+      <button type="submit" class="btn btn-danger">Delete</button>
+      <router-link class="btn btn-default" v-bind:to="'/'">Cancel</router-link>
+    </form>
+  </div>
+</template>
+
+<script>
+var api = axios.create({
+  baseURL: 'api.php'
+});
+
+var util = {
+  methods: {
+    resolve: function (path, obj) {
+      return path.reduce(function(prev, curr) {
+        return prev ? prev[curr] : undefined
+      }, obj || this);
+    },
+    getDisplayColumn: function (columns) {
+      var index = null;
+      var names = ['name', 'title', 'description', 'username'];
+      for (var i = 0; i < names.length; i++) {
+        index = columns.indexOf(names[i]);
+        if (index >= 0) {
+          return index;
+        }
+      }
+      return false;
+    },
+    getProperties: function (action) {
+      switch (action) {
+        case 'list':
+          path = ['/' + this.subject, 'get', 'responses', '200', 'schema', 'items', 'properties'];
+          break;
+        case 'read':
+          path = ['/' + this.subject + '/{id}', 'get', 'responses', '200', 'schema', 'properties'];
+          break;
+        case 'add':
+          path = ['/' + this.subject, 'post', 'parameters', 0, 'schema', 'properties'];
+          break;
+        case 'edit':
+          path = ['/' + this.subject + '/{id}', 'put', 'parameters', 1, 'schema', 'properties'];
+          break;
+        case 'delete':
+          path = ['/' + this.subject + '/{id}', 'delete', 'parameters', 1, 'schema', 'properties'];
+          break;
+      }
+      return this.resolve(path, this.paths);
+    }
+  }
+};
+
+Vue.component('menu-component', {
+  mixins: [util],
+  template: '#menu',
+  props: ['subjects']
+})
+
+var Overview = Vue.extend({
+  template: '#overview'
+});
+
+var List = Vue.extend({
+  mixins: [util],
+  template: '#list',
+  data: function () {
+    return {
+      data: null,
+      subject: this.$route.params.subject
+    };
+  },
+  props: ['paths'],
+  created: function () {
+    this.update();
+  },
+  watch: {
+    '$route': 'update'
+  },
+  computed: {
+    related: function () {
+      return (this.referenced.filter(function (value) { return value; }).length > 0);
+    },
+    include: function () {
+      return this.references.filter(function (value) { return value; }).join();
+    },
+    properties: function () {
+      return this.getProperties('list');
+    },
+    references: function () {
+      var refs = [];
+      for (key in this.properties) {
+        if (this.properties[key]['x-references']) {
+          refs.push(this.properties[key]['x-references']);
+        } else {
+          refs.push(false);
+        }
+      }
+      return refs;
+    },
+    referenced: function () {
+      var referenced = [];
+      for (key in this.properties) {
+        if (this.properties[key]['x-referenced']) {
+          referenced.push(this.properties[key]['x-referenced']);
+        } else {
+          referenced.push(false);
+        }
+      }
+      return referenced;
+    },
+    primaryKey: function () {
+      var i = 0;
+      for (key in this.properties) {
+        if (this.properties[key]['x-primary-key']) {
+          return i;
+        }
+        i++;
+      }
+      return false;
+    }
+  },
+  methods: {
+    referenceText(subject, field, id) {
+      var self = this;
+      var columns = self.data[subject]['columns'];
+      var records = self.data[subject]['records'];
+      var displayColumn = self.getDisplayColumn(columns);
+      for (var i = 0; i < records.length; i++) {
+        if (records[i][columns.indexOf(field)] == id) {
+          if (displayColumn === false) {
+            return records[i][0];
+          } else {
+            return records[i][displayColumn];
+          }
+        }
+      }
+      return false;
+    },
+    update () {
+      var self = this;
+
+      self.data = null;
+      self.subject = this.$route.params.subject;
+
+      var url = '/' + self.subject;
+      if (self.include) url += '?include=' + self.include;
+      api.get(url).then(function (response) {
+        self.data = response.data;
+      }).catch(function (error) {
+        console.log(error);
+      });
+    }
+  }
+});
+
+var View = Vue.extend({
+  mixins: [util],
+  template: '#view',
+  props: ['paths'],
+  data: function () {
+    return {
+      id: this.$route.params.id,
+      subject: this.$route.params.subject,
+      data: null
+    };
+  },
+  watch: {
+    '$route': 'update'
+  },
+  created: function () {
+    this.update();
+  },
+  computed: {
+    properties: function () {
+      return this.getProperties('read');
+    }
+  },
+  methods: {
+    update: function () {
+      var self = this;
+
+      self.data = null;
+      self.id = this.$route.params.id;
+      self.subject = this.$route.params.subject;
+
+      api.get('/' + self.subject + '/' + self.id).then(function (response) {
+        self.data = response.data;
+      }).catch(function (error) {
+        console.log(error);
+      });
+    }
+  }
+});
+
+var Edit = Vue.extend({
+  template: '#edit',
+  data: function () {
+    return {
+      id: this.$route.params.id,
+      subject: this.$route.params.subject,
+      record: null
+    };
+  },
+  created: function () {
+    var self = this;
+    api.get('/' + self.subject + '/' + self.id).then(function (response) {
+      self.record = response.data;
+    }).catch(function (error) {
+      console.log(error);
+    });
+  },
+  methods: {
+    updatepost: function () {
+      var record = this.record;
+      api.put('/' + self.subject + '/', record).then(function (response) {
+        console.log(response.data);
+      }).catch(function (error) {
+        console.log(error);
+      });
+      router.push('/');
+    }
+  }
+});
+
+var Delete = Vue.extend({
+  template: '#delete',
+  data: function () {
+    return {post: findpost(this.$route.params.post_id)};
+  },
+  methods: {
+    deletepost: function () {
+      var post = this.post;
+      api.delete('/posts/' + post.id).then(function (response) {
+        console.log(response.data);
+      }).catch(function (error) {
+        console.log(error);
+      });
+      router.push('/');
+    }
+  }
+});
+
+var Add = Vue.extend({
+  template: '#add',
+  data: function () {
+    return {post: {content: '', user_id: 1, category_id: 1}}
+  },
+  methods: {
+    createpost: function() {
+      var post = this.post;
+      api.post('/posts', post).then(function (response) {
+        post.id = response.data;
+      }).catch(function (error) {
+        console.log(error);
+      });
+      router.push('/');
+    }
+  }
+});
+
+var router = new VueRouter({
+  linkActiveClass: 'active',
+  routes:[
+    { path: '/', component: Overview},
+    { path: '/:subject/add', component: Add, name: 'Add'},
+    { path: '/:subject/edit/:id', component: Edit, name: 'Edit'},
+    { path: '/:subject/delete/:id', component: Delete, name: 'Delete'},
+    { path: '/:subject', component: List, name: 'List'},
+    { path: '/:subject/:id', component: View, name: 'View'}
+  ]
+});
+app = new Vue({
+  router: router,
+  data: function () {
+    return {definition: null};
+  },
+  created: function () {
+    var self = this;
+    api.post('/',{username:"admin",password:"admin"}).then(function (response) {
+      api.get('').then(function (response) {
+        self.definition = response.data;
+      }).catch(function (error) {
+        console.log(error);
+      });
+    }).catch(function (error) {
+      console.log(error);
+    });
+  }
+}).$mount('#app')
+</script>
+
+</body>
+</html>
