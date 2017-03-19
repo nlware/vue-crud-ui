@@ -125,9 +125,8 @@
     <form v-else v-on:submit="updateRecord">
       <div class="form-group">
         <template v-for="(value, key) in record">
-          <div>{{ key }}</div>
-          <label for="edit-{{ key }}">{{ key }}</label>
-          <input class="form-control" id="edit-{{ key }}" v-model="record.{{ key }}" />
+          <label v-bind:for="key">{{ key }}</label>
+          <input class="form-control" v-bind:id="key" v-model="record[key]" />
         </template>
       </div>
       <button type="submit" class="btn btn-primary">Save</button>
