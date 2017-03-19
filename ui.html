@@ -54,18 +54,17 @@
         Add
       </router-link>
     </div>
-    <p v-if="data===null">
-    </p>
+    <p v-if="records===null">Loading...</p>
     <table v-else class="table">
       <thead>
         <tr>
-          <th v-for="value in data[subject]['columns']">{{ value }}</th>
+          <th v-for="value in records[subject]['columns']">{{ value }}</th>
           <th v-if="related">related</th>
           <th>actions</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="record in data[subject]['records']">
+        <tr v-for="record in records[subject]['records']">
           <template v-for="(value, key, index) in record">
             <td v-if="references[key] !== false">
               <router-link v-bind:to="{name: 'View', params: {subject: references[key][0], id: value}}">{{ referenceText(references[key][0], references[key][1], value) }}</router-link>
@@ -93,42 +92,46 @@
 <template id="add">
   <div>
     <h2>Add</h2>
-    <form v-on:submit="createpost">
+    <form v-on:submit="createRecord">
       <div class="form-group">
         <label for="add-content">Content</label>
         <textarea class="form-control" id="add-content" rows="10" v-model="post.content"></textarea>
       </div>
       <button type="submit" class="btn btn-primary">Create</button>
-      <router-link class="btn btn-default" v-bind:to="'/'">Cancel</router-link>
+      <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
   </div>
 </template>
 
 <template id="view">
   <div>
-    <p v-if="data===null">Loading...</p>
+    <p v-if="record===null">Loading...</p>
     <dl v-else>
-      <template v-for="(value, key) in data">
-       <dt>{{ key }} </dt>
+      <template v-for="(value, key) in record">
+        <dt>{{ key }} </dt>
         <dd>{{ value }}</dd>
       </template>
     </dl>
     <br/>
     <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
-    <router-link v-bind:to="'/'">Back to list</router-link>
+    <router-link v-bind:to="{name: 'List', params: {subject: subject}}">Back to list</router-link>
   </div>
 </template>
 
 <template id="edit">
   <div>
     <h2>Edit post</h2>
-    <form v-on:submit="updatepost">
+    <p v-if="record===null">Loading...</p>
+    <form v-else v-on:submit="updateRecord">
       <div class="form-group">
-        <label for="edit-content">Content</label>
-        <textarea class="form-control" id="edit-content" rows="3" v-model="post.content"></textarea>
+        <template v-for="(value, key) in record">
+          <div>{{ key }}</div>
+          <label for="edit-{{ key }}">{{ key }}</label>
+          <input class="form-control" id="edit-{{ key }}" v-model="record.{{ key }}" />
+        </template>
       </div>
       <button type="submit" class="btn btn-primary">Save</button>
-      <router-link class="btn btn-default" v-bind:to="'/'">Cancel</router-link>
+      <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
   </div>
 </template>
@@ -136,10 +139,10 @@
 <template id="delete">
   <div>
     <h2>Delete #{{ record.id }}</h2>
-    <form v-on:submit="deletepost">
+    <form v-on:submit="deleteRecord">
       <p>The action cannot be undone.</p>
       <button type="submit" class="btn btn-danger">Delete</button>
-      <router-link class="btn btn-default" v-bind:to="'/'">Cancel</router-link>
+      <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
   </div>
 </template>
@@ -197,6 +200,7 @@ Vue.component('menu-component', {
 })
 
 var Overview = Vue.extend({
+  mixins: [util],
   template: '#overview'
 });
 
@@ -205,16 +209,16 @@ var List = Vue.extend({
   template: '#list',
   data: function () {
     return {
-      data: null,
+      records: null,
       subject: this.$route.params.subject
     };
   },
   props: ['paths'],
   created: function () {
-    this.update();
+    this.readRecords();
   },
   watch: {
-    '$route': 'update'
+    '$route': 'readRecords'
   },
   computed: {
     related: function () {
@@ -262,8 +266,8 @@ var List = Vue.extend({
   methods: {
     referenceText(subject, field, id) {
       var self = this;
-      var columns = self.data[subject]['columns'];
-      var records = self.data[subject]['records'];
+      var columns = self.records[subject]['columns'];
+      var records = self.records[subject]['records'];
       var displayColumn = self.getDisplayColumn(columns);
       for (var i = 0; i < records.length; i++) {
         if (records[i][columns.indexOf(field)] == id) {
@@ -276,16 +280,14 @@ var List = Vue.extend({
       }
       return false;
     },
-    update () {
+    readRecords: function () {
       var self = this;
-
-      self.data = null;
       self.subject = this.$route.params.subject;
-
+      self.records = null;
       var url = '/' + self.subject;
       if (self.include) url += '?include=' + self.include;
       api.get(url).then(function (response) {
-        self.data = response.data;
+        self.records = response.data;
       }).catch(function (error) {
         console.log(error);
       });
@@ -301,14 +303,14 @@ var View = Vue.extend({
     return {
       id: this.$route.params.id,
       subject: this.$route.params.subject,
-      data: null
+      record: null
     };
   },
   watch: {
-    '$route': 'update'
+    '$route': 'readRecord'
   },
   created: function () {
-    this.update();
+    this.readRecord();
   },
   computed: {
     properties: function () {
@@ -316,15 +318,13 @@ var View = Vue.extend({
     }
   },
   methods: {
-    update: function () {
+    readRecord: function () {
       var self = this;
-
-      self.data = null;
       self.id = this.$route.params.id;
       self.subject = this.$route.params.subject;
-
+      self.record = null;
       api.get('/' + self.subject + '/' + self.id).then(function (response) {
-        self.data = response.data;
+        self.record = response.data;
       }).catch(function (error) {
         console.log(error);
       });
@@ -333,6 +333,7 @@ var View = Vue.extend({
 });
 
 var Edit = Vue.extend({
+  mixins: [util],
   template: '#edit',
   data: function () {
     return {
@@ -342,17 +343,22 @@ var Edit = Vue.extend({
     };
   },
   created: function () {
-    var self = this;
-    api.get('/' + self.subject + '/' + self.id).then(function (response) {
-      self.record = response.data;
-    }).catch(function (error) {
-      console.log(error);
-    });
+    this.readRecord();
   },
   methods: {
-    updatepost: function () {
-      var record = this.record;
-      api.put('/' + self.subject + '/', record).then(function (response) {
+    readRecord: function () {
+      var self = this;
+      self.id = this.$route.params.id;
+      self.subject = this.$route.params.subject;
+      self.record = null;
+      api.get('/' + self.subject + '/' + self.id).then(function (response) {
+        self.record = response.data;
+      }).catch(function (error) {
+        console.log(error);
+      });
+    },
+    updateRecord: function () {
+      api.put('/' + self.subject + '/' + self.id, this.record).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
         console.log(error);
@@ -363,14 +369,19 @@ var Edit = Vue.extend({
 });
 
 var Delete = Vue.extend({
+  mixins: [util],
   template: '#delete',
   data: function () {
-    return {post: findpost(this.$route.params.post_id)};
+    return {
+      id: this.$route.params.id,
+      subject: this.$route.params.subject,
+      record: null
+    };
   },
   methods: {
-    deletepost: function () {
-      var post = this.post;
-      api.delete('/posts/' + post.id).then(function (response) {
+    deleteRecord: function () {
+      var post = this.record;
+      api.delete('/' + self.subject + '/' + self.id).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
         console.log(error);
@@ -381,15 +392,20 @@ var Delete = Vue.extend({
 });
 
 var Add = Vue.extend({
+  mixins: [util],
   template: '#add',
   data: function () {
-    return {post: {content: '', user_id: 1, category_id: 1}}
+    return {
+      id: this.$route.params.id,
+      subject: this.$route.params.subject,
+      record: null
+    };
   },
   methods: {
-    createpost: function() {
-      var post = this.post;
-      api.post('/posts', post).then(function (response) {
-        post.id = response.data;
+    createRecord: function() {
+      var post = this.record;
+      api.post('/' + self.subject, post).then(function (response) {
+        record.id = response.data;
       }).catch(function (error) {
         console.log(error);
       });
