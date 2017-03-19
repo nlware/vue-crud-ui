@@ -92,10 +92,12 @@
   <div>
     <h2>Add</h2>
     <form v-on:submit="createRecord">
-      <div class="form-group">
-        <label for="add-content">Content</label>
-        <textarea class="form-control" id="add-content" rows="10" v-model="post.content"></textarea>
-      </div>
+      <template v-for="(value, key) in record">
+        <div class="form-group">
+          <label v-bind:for="key">{{ key }}</label>
+          <input class="form-control" v-bind:id="key" v-model="record[key]" />
+        </div>
+      </template>
       <button type="submit" class="btn btn-primary">Create</button>
       <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
@@ -122,12 +124,12 @@
     <h2>Edit post</h2>
     <p v-if="record===null">Loading...</p>
     <form v-else v-on:submit="updateRecord">
-      <div class="form-group">
-        <template v-for="(value, key) in record">
+      <template v-for="(value, key) in record">
+        <div class="form-group">
           <label v-bind:for="key">{{ key }}</label>
           <input class="form-control" v-bind:id="key" v-model="record[key]" />
-        </template>
-      </div>
+        </div>
+      </template>
       <button type="submit" class="btn btn-primary">Save</button>
       <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
@@ -271,10 +273,9 @@ var List = Vue.extend({
   },
   methods: {
     referenceText(subject, field, id) {
-      var self = this;
-      var columns = self.records[subject]['columns'];
-      var records = self.records[subject]['records'];
-      var displayColumn = self.getDisplayColumn(columns);
+      var columns = this.records[subject]['columns'];
+      var records = this.records[subject]['records'];
+      var displayColumn = this.getDisplayColumn(columns);
       for (var i = 0; i < records.length; i++) {
         if (records[i][columns.indexOf(field)] == id) {
           if (displayColumn === false) {
@@ -287,11 +288,11 @@ var List = Vue.extend({
       return false;
     },
     readRecords: function () {
+      this.subject = this.$route.params.subject;
+      this.records = null;
+      var url = '/' + this.subject;
+      if (this.include) url += '?include=' + this.include;
       var self = this;
-      self.subject = this.$route.params.subject;
-      self.records = null;
-      var url = '/' + self.subject;
-      if (self.include) url += '?include=' + self.include;
       api.get(url).then(function (response) {
         self.records = response.data;
       }).catch(function (error) {
@@ -325,11 +326,11 @@ var View = Vue.extend({
   },
   methods: {
     readRecord: function () {
+      this.id = this.$route.params.id;
+      this.subject = this.$route.params.subject;
+      this.record = null;
       var self = this;
-      self.id = this.$route.params.id;
-      self.subject = this.$route.params.subject;
-      self.record = null;
-      api.get('/' + self.subject + '/' + self.id).then(function (response) {
+      api.get('/' + this.subject + '/' + this.id).then(function (response) {
         self.record = response.data;
       }).catch(function (error) {
         console.log(error);
@@ -353,23 +354,23 @@ var Edit = Vue.extend({
   },
   methods: {
     readRecord: function () {
+      this.id = this.$route.params.id;
+      this.subject = this.$route.params.subject;
+      this.record = null;
       var self = this;
-      self.id = this.$route.params.id;
-      self.subject = this.$route.params.subject;
-      self.record = null;
-      api.get('/' + self.subject + '/' + self.id).then(function (response) {
+      api.get('/' + this.subject + '/' + this.id).then(function (response) {
         self.record = response.data;
       }).catch(function (error) {
         console.log(error);
       });
     },
     updateRecord: function () {
-      api.put('/' + self.subject + '/' + self.id, this.record).then(function (response) {
+      api.put('/' + this.subject + '/' + this.id, this.record).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
         console.log(error);
       });
-      router.push('/');
+      router.push({name: 'List', params: {subject: this.subject}});
     }
   }
 });
@@ -387,12 +388,12 @@ var Delete = Vue.extend({
   methods: {
     deleteRecord: function () {
       var post = this.record;
-      api.delete('/' + self.subject + '/' + self.id).then(function (response) {
+      api.delete('/' + this.subject + '/' + this.id).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
         console.log(error);
       });
-      router.push('/');
+      router.push({name: 'List', params: {subject: this.subject}});
     }
   }
 });
@@ -410,12 +411,12 @@ var Add = Vue.extend({
   methods: {
     createRecord: function() {
       var post = this.record;
-      api.post('/' + self.subject, post).then(function (response) {
+      api.post('/' + this.subject, post).then(function (response) {
         record.id = response.data;
       }).catch(function (error) {
         console.log(error);
       });
-      router.push('/');
+      router.push({name: 'List', params: {subject: this.subject}});
     }
   }
 });
