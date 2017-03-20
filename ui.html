@@ -408,11 +408,17 @@ var Add = Vue.extend({
       record: null
     };
   },
+  created: function () {
+    this.initRecord();
+  },
   methods: {
+    initRecord: function () {
+      // read defaults into: this.record
+    },
     createRecord: function() {
-      var post = this.record;
-      api.post('/' + this.subject, post).then(function (response) {
-        record.id = response.data;
+      var self = this;
+      api.post('/' + this.subject, this.record).then(function (response) {
+        self.record.id = response.data;
       }).catch(function (error) {
         console.log(error);
       });
