@@ -138,7 +138,7 @@
 
 <template id="delete">
   <div>
-    <h2>Delete #{{ record.id }}</h2>
+    <h2>Delete #{{ id }}</h2>
     <form v-on:submit="deleteRecord">
       <p>The action cannot be undone.</p>
       <button type="submit" class="btn btn-danger">Delete</button>
@@ -342,6 +342,7 @@ var View = Vue.extend({
 var Edit = Vue.extend({
   mixins: [util],
   template: '#edit',
+  props: ['paths'],
   data: function () {
     return {
       id: this.$route.params.id,
@@ -376,18 +377,15 @@ var Edit = Vue.extend({
 });
 
 var Delete = Vue.extend({
-  mixins: [util],
   template: '#delete',
   data: function () {
     return {
       id: this.$route.params.id,
-      subject: this.$route.params.subject,
-      record: null
+      subject: this.$route.params.subject
     };
   },
   methods: {
     deleteRecord: function () {
-      var post = this.record;
       api.delete('/' + this.subject + '/' + this.id).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
@@ -401,6 +399,7 @@ var Delete = Vue.extend({
 var Add = Vue.extend({
   mixins: [util],
   template: '#add',
+  props: ['paths'],
   data: function () {
     return {
       id: this.$route.params.id,
@@ -411,9 +410,23 @@ var Add = Vue.extend({
   created: function () {
     this.initRecord();
   },
+  computed: {
+    properties: function () {
+      return this.getProperties('add');
+    }
+  },
   methods: {
     initRecord: function () {
-      // read defaults into: this.record
+      this.record = {};
+      for (key in this.properties) {
+        if (!this.properties[key]['x-primary-key']) {
+          if (this.properties[key].default) {
+            this.record[key] = this.properties[key].default;
+          } else {
+            this.record[key] = '';
+          }
+        }
+      }
     },
     createRecord: function() {
       var self = this;
@@ -455,7 +468,7 @@ app = new Vue({
       console.log(error);
     });
   }
-}).$mount('#app')
+}).$mount('#app');
 </script>
 
 </body>
