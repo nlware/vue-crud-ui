@@ -389,21 +389,17 @@ var Edit = Vue.extend({
       for (var i = 0; i < this.references.length; i++) {
         if (this.references[i] !== false) {
           var props = this.getProperties('list', this.references[i][0], this.paths);
-          var primaryKey = null;
           var columns = [];
           for (key in props) {
             columns.push(key);
-            if (props[key]['x-primary-key']) {
-              primaryKey = key;
-            }
           }
           var displayColumn = this.getDisplayColumn(columns);
           if (displayColumn) {
             displayColumn = columns[displayColumn];
           } else {
-            displayColumn = primaryKey;
+            displayColumn = this.references[i][0];
           }
-          api.get('/' + this.references[i][0] + '?columns=' + primaryKey + ',' + displayColumn).then(function (i, response) {
+          api.get('/' + this.references[i][0] + '?columns=' + this.references[i][1] + ',' + displayColumn).then(function (i, response) {
             self.options[self.references[i][0]] = response.data[self.references[i][0]].records;
           }.bind(null, i)).catch(function (error) {
             console.log(error);
