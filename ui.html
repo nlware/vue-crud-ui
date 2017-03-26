@@ -122,10 +122,14 @@
     <h2>{{ subject }}: edit</h2>
     <p v-if="record===null">Loading...</p>
     <form v-else v-on:submit="updateRecord">
-      <template v-for="(value, key) in record">
+      <template v-for="(value, key, index) in record">
         <div class="form-group">
           <label v-bind:for="key">{{ key }}</label>
-          <input class="form-control" v-bind:id="key" v-model="record[key]" />
+          <input v-if="references[index] === false" class="form-control" v-bind:id="key" v-model="record[key]" :disabled="index === primaryKey" />
+          <select v-else class="form-control" v-bind:id="key" v-model="record[key]">
+            <option value=""></option>
+            <option v-for="option in options[references[index][0]]" v-bind:value="option[0]">{{ option[1] }}</option>
+          </select>
         </div>
       </template>
       <button type="submit" class="btn btn-primary">Save</button>
@@ -176,25 +180,57 @@ var util = {
       }
       return false;
     },
-    getProperties: function (action) {
+    getPrimaryKey: function (properties) {
+      var i = 0;
+      for (key in properties) {
+        if (properties[key]['x-primary-key']) {
+          return i;
+        }
+        i++;
+      }
+      return false;
+    },
+    getReferenced: function (properties) {
+      var referenced = [];
+      for (key in properties) {
+        if (properties[key]['x-referenced']) {
+          referenced.push(properties[key]['x-referenced']);
+        } else {
+          referenced.push(false);
+        }
+      }
+      return referenced;
+    },
+    getReferences: function (properties) {
+      var references = [];
+      for (key in properties) {
+        if (properties[key]['x-references']) {
+          references.push(properties[key]['x-references']);
+        } else {
+          references.push(false);
+        }
+      }
+      return references;
+    },
+    getProperties: function (action, subject, paths) {
       switch (action) {
         case 'list':
-          path = ['/' + this.subject, 'get', 'responses', '200', 'schema', 'items', 'properties'];
+          path = ['/' + subject, 'get', 'responses', '200', 'schema', 'items', 'properties'];
           break;
         case 'read':
-          path = ['/' + this.subject + '/{id}', 'get', 'responses', '200', 'schema', 'properties'];
+          path = ['/' + subject + '/{id}', 'get', 'responses', '200', 'schema', 'properties'];
           break;
         case 'add':
-          path = ['/' + this.subject, 'post', 'parameters', 0, 'schema', 'properties'];
+          path = ['/' + subject, 'post', 'parameters', 0, 'schema', 'properties'];
           break;
         case 'edit':
-          path = ['/' + this.subject + '/{id}', 'put', 'parameters', 1, 'schema', 'properties'];
+          path = ['/' + subject + '/{id}', 'put', 'parameters', 1, 'schema', 'properties'];
           break;
         case 'delete':
-          path = ['/' + this.subject + '/{id}', 'delete', 'parameters', 1, 'schema', 'properties'];
+          path = ['/' + subject + '/{id}', 'delete', 'parameters', 1, 'schema', 'properties'];
           break;
       }
-      return this.resolve(path, this.paths);
+      return this.resolve(path, paths);
     }
   }
 };
@@ -234,39 +270,16 @@ var List = Vue.extend({
       return this.references.filter(function (value) { return value; }).join();
     },
     properties: function () {
-      return this.getProperties('list');
+      return this.getProperties('list', this.subject, this.paths);
     },
     references: function () {
-      var refs = [];
-      for (key in this.properties) {
-        if (this.properties[key]['x-references']) {
-          refs.push(this.properties[key]['x-references']);
-        } else {
-          refs.push(false);
-        }
-      }
-      return refs;
+      return this.getReferences(this.properties);
     },
     referenced: function () {
-      var referenced = [];
-      for (key in this.properties) {
-        if (this.properties[key]['x-referenced']) {
-          referenced.push(this.properties[key]['x-referenced']);
-        } else {
-          referenced.push(false);
-        }
-      }
-      return referenced;
+      return this.getReferenced(this.properties);
     },
     primaryKey: function () {
-      var i = 0;
-      for (key in this.properties) {
-        if (this.properties[key]['x-primary-key']) {
-          return i;
-        }
-        i++;
-      }
-      return false;
+      return this.getPrimaryKey(this.properties);
     }
   },
   methods: {
@@ -319,7 +332,7 @@ var View = Vue.extend({
   },
   computed: {
     properties: function () {
-      return this.getProperties('read');
+      return this.getProperties('read', this.subject, this.paths);
     }
   },
   methods: {
@@ -345,18 +358,43 @@ var Edit = Vue.extend({
     return {
       id: this.$route.params.id,
       subject: this.$route.params.subject,
-      record: null
+      record: null,
+      options: {}
     };
   },
   created: function () {
     this.readRecord();
+  },
+  computed: {
+    properties: function () {
+      return this.getProperties('edit', this.subject, this.paths);
+    },
+    primaryKey: function () {
+      return this.getPrimaryKey(this.properties);
+    },
+    referenced: function () {
+      return this.getReferenced(this.properties);
+    },
+    references: function () {
+      return this.getReferences(this.properties);
+    },
   },
   methods: {
     readRecord: function () {
       this.id = this.$route.params.id;
       this.subject = this.$route.params.subject;
       this.record = null;
+      this.options = {};
       var self = this;
+      for (var i = 0; i < this.references.length; i++) {
+        if (this.references[i] !== false) {
+          api.get('/' + this.references[i][0]).then(function (i, response) {
+            self.options[self.references[i][0]] = response.data[self.references[i][0]].records;
+          }.bind(null, i)).catch(function (error) {
+            console.log(error);
+          });
+        }
+      }
       api.get('/' + this.subject + '/' + this.id).then(function (response) {
         self.record = response.data;
       }).catch(function (error) {
@@ -410,7 +448,7 @@ var Add = Vue.extend({
   },
   computed: {
     properties: function () {
-      return this.getProperties('add');
+      return this.getProperties('add', this.subject, this.paths);
     }
   },
   methods: {
