@@ -90,7 +90,7 @@
 
 <template id="add">
   <div>
-    <h2>Add</h2>
+    <h2>{{ subject }}: add</h2>
     <form v-on:submit="createRecord">
       <template v-for="(value, key) in record">
         <div class="form-group">
@@ -106,6 +106,7 @@
 
 <template id="view">
   <div>
+    <h2>{{ subject }}: view</h2>
     <p v-if="record===null">Loading...</p>
     <dl v-else>
       <template v-for="(value, key) in record">
@@ -113,15 +114,12 @@
         <dd>{{ value }}</dd>
       </template>
     </dl>
-    <br/>
-    <span class="glyphicon glyphicon-arrow-left" aria-hidden="true"></span>
-    <router-link v-bind:to="{name: 'List', params: {subject: subject}}">Back to list</router-link>
   </div>
 </template>
 
 <template id="edit">
   <div>
-    <h2>Edit post</h2>
+    <h2>{{ subject }}: edit</h2>
     <p v-if="record===null">Loading...</p>
     <form v-else v-on:submit="updateRecord">
       <template v-for="(value, key) in record">
@@ -138,7 +136,7 @@
 
 <template id="delete">
   <div>
-    <h2>Delete #{{ id }}</h2>
+    <h2>{{ subject }}: delete #{{ id }}</h2>
     <form v-on:submit="deleteRecord">
       <p>The action cannot be undone.</p>
       <button type="submit" class="btn btn-danger">Delete</button>
