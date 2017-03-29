@@ -128,7 +128,7 @@
           <input v-if="references[index] === false" class="form-control" v-bind:id="key" v-model="record[key]" :disabled="index === primaryKey" />
           <select v-else class="form-control" v-bind:id="key" v-model="record[key]">
             <option value=""></option>
-            <option v-for="option in options[references[index][0]]" v-bind:value="option[0]">{{ option[1] }}</option>
+            <option v-for="option in options[references[index][0]]" v-bind:value="option.key">{{ option.value }}</option>
           </select>
         </div>
       </template>
@@ -384,28 +384,8 @@ var Edit = Vue.extend({
       this.id = this.$route.params.id;
       this.subject = this.$route.params.subject;
       this.record = null;
-      this.options = {};
       var self = this;
-      for (var i = 0; i < this.references.length; i++) {
-        if (this.references[i] !== false) {
-          var props = this.getProperties('list', this.references[i][0], this.paths);
-          var columns = [];
-          for (key in props) {
-            columns.push(key);
-          }
-          var displayColumn = this.getDisplayColumn(columns);
-          if (displayColumn) {
-            displayColumn = columns[displayColumn];
-          } else {
-            displayColumn = this.references[i][0];
-          }
-          api.get('/' + this.references[i][0] + '?columns=' + this.references[i][1] + ',' + displayColumn).then(function (i, response) {
-            self.options[self.references[i][0]] = response.data[self.references[i][0]].records;
-          }.bind(null, i)).catch(function (error) {
-            console.log(error);
-          });
-        }
-      }
+      this.populateOptions();
       api.get('/' + this.subject + '/' + this.id).then(function (response) {
         self.record = response.data;
       }).catch(function (error) {
@@ -419,6 +399,31 @@ var Edit = Vue.extend({
         console.log(error);
       });
       router.push({name: 'List', params: {subject: this.subject}});
+    },
+    populateOptions: function() {
+      this.options = {};
+      var self = this;
+      for (var i = 0; i < this.references.length; i++) {
+        if (this.references[i] !== false) {
+          var columns = Object.keys(this.getProperties('list', this.references[i][0], this.paths));
+          var displayColumn = this.getDisplayColumn(columns);
+          if (displayColumn) {
+            displayColumn = columns[displayColumn];
+          } else {
+            displayColumn = this.references[i][1];
+          }
+          api.get('/' + this.references[i][0] + '?columns=' + this.references[i][1] + ',' + displayColumn).then(function (i, displayColumn, response) {
+            var subject = Object.keys(response.data)[0];
+            var keyIndex = response.data[subject].columns.indexOf(self.references[i][1]);
+            var valueIndex = response.data[subject].columns.indexOf(displayColumn);
+            self.options[subject] = response.data[subject].records.map(function (record) {
+              return {key: record[keyIndex], value: record[valueIndex]};
+            });
+          }.bind(null, i, displayColumn)).catch(function (error) {
+            console.log(error);
+          });
+        }
+      }
     }
   }
 });
