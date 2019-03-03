@@ -215,7 +215,7 @@ var util = {
     getProperties: function (action, subject, paths) {
       switch (action) {
         case 'list':
-          path = ['/' + subject, 'get', 'responses', '200', 'schema', 'items', 'properties'];
+          path = ['/' + subject, 'get', 'responses', '200', 'schema', 'properties', subject, 'items', 'properties'];
           break;
         case 'read':
           path = ['/' + subject + '/{id}', 'get', 'responses', '200', 'schema', 'properties'];
