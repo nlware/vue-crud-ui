@@ -5,11 +5,11 @@
   <title>VUE-CRUD-UI</title>
   <meta name="description" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.1.10/vue.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/2.2.1/vue-router.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.15.3/axios.js"></script>
-  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
-  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap-theme.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/3.0.2/vue-router.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.js"></script>
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap-theme.min.css">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
         <menu-component v-if="definition!==null" :subjects="definition.tags"></menu-component>
       </div>
       <div class="col-md-9">
-        <router-view v-if="definition!==null" :paths="definition.paths"></router-view>
+        <router-view v-if="definition!==null" :definition="definition"></router-view>
       </div>
     </div>
   </main>
@@ -57,23 +57,23 @@
     <table v-else class="table">
       <thead>
         <tr>
-          <th v-for="value in records[subject]['columns']">{{ value }}</th>
+          <th v-for="value in Object.keys(records[0])">{{ value }}</th>
           <th v-if="related">related</th>
           <th>actions</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="record in records[subject]['records']">
+        <tr v-for="record in records">
           <template v-for="(value, key, index) in record">
             <td v-if="references[key] !== false">
-              <router-link v-bind:to="{name: 'View', params: {subject: references[key][0], id: value}}">{{ referenceText(references[key][0], references[key][1], value) }}</router-link>
+              <router-link v-bind:to="{name: 'View', params: {subject: references[key], id: referenceId(references[key], record[key])}}">{{ referenceText(references[key], record[key]) }}</router-link>
             </td>
             <td v-else>{{ value }}</td>
           </template>
-          <td>
+          <td v-if="related">
             <template v-for="(relations, i) in referenced">
               <template v-for="(relation, j) in relations">
-                <router-link v-bind:to="{name: 'List', params: {subject: relation[0]}}">{{ relation[0] }}</router-link>
+                <router-link v-bind:to="{name: 'List', params: {subject: relation.split('.')[0]}}">{{ relation.split('.')[0] }} </router-link>
               </template>
             </template>
           </td>
@@ -88,9 +88,9 @@
   </div>
 </template>
 
-<template id="add">
+<template id="create">
   <div>
-    <h2>{{ subject }}: add</h2>
+    <h2>{{ subject }}: create</h2>
     <form v-on:submit="createRecord">
       <template v-for="(value, key) in record">
         <div class="form-group">
@@ -117,9 +117,9 @@
   </div>
 </template>
 
-<template id="edit">
+<template id="update">
   <div>
-    <h2>{{ subject }}: edit</h2>
+    <h2>{{ subject }}: update</h2>
     <p v-if="record===null">Loading...</p>
     <form v-else v-on:submit="updateRecord">
       <template v-for="(value, key, index) in record">
@@ -175,18 +175,16 @@ var util = {
       for (var i = 0; i < names.length; i++) {
         index = columns.indexOf(names[i]);
         if (index >= 0) {
-          return index;
+          return names[i];
         }
       }
-      return false;
+      return columns[0];
     },
     getPrimaryKey: function (properties) {
-      var i = 0;
       for (key in properties) {
         if (properties[key]['x-primary-key']) {
-          return i;
+          return key;
         }
-        i++;
       }
       return false;
     },
@@ -195,42 +193,28 @@ var util = {
       for (key in properties) {
         if (properties[key]['x-referenced']) {
           referenced.push(properties[key]['x-referenced']);
-        } else {
-          referenced.push(false);
         }
       }
       return referenced;
     },
     getReferences: function (properties) {
-      var references = [];
+      var references = {};
       for (key in properties) {
         if (properties[key]['x-references']) {
-          references.push(properties[key]['x-references']);
+          references[key] = properties[key]['x-references'];
         } else {
-          references.push(false);
+          references[key] = false; 
         }
       }
       return references;
     },
-    getProperties: function (action, subject, paths) {
-      switch (action) {
-        case 'list':
-          path = ['/' + subject, 'get', 'responses', '200', 'schema', 'items', 'properties'];
-          break;
-        case 'read':
-          path = ['/' + subject + '/{id}', 'get', 'responses', '200', 'schema', 'properties'];
-          break;
-        case 'add':
-          path = ['/' + subject, 'post', 'parameters', 0, 'schema', 'properties'];
-          break;
-        case 'edit':
-          path = ['/' + subject + '/{id}', 'put', 'parameters', 1, 'schema', 'properties'];
-          break;
-        case 'delete':
-          path = ['/' + subject + '/{id}', 'delete', 'parameters', 1, 'schema', 'properties'];
-          break;
+    getProperties: function (action, subject, definition) {
+      if (action == 'list') {
+        path = ['components', 'schemas', action + '-' + subject, 'properties', 'records', 'items', 'properties'];
+      } else {
+        path = ['components', 'schemas', action + '-' + subject, 'properties'];
       }
-      return this.resolve(path, paths);
+      return this.resolve(path, definition);
     }
   }
 };
@@ -255,7 +239,7 @@ var List = Vue.extend({
       subject: this.$route.params.subject
     };
   },
-  props: ['paths'],
+  props: ['definition'],
   created: function () {
     this.readRecords();
   },
@@ -266,11 +250,11 @@ var List = Vue.extend({
     related: function () {
       return (this.referenced.filter(function (value) { return value; }).length > 0);
     },
-    include: function () {
-      return this.references.filter(function (value) { return value; }).join();
+    join: function () {
+      return Object.values(this.references).filter(function (value) { return value; }).join();
     },
     properties: function () {
-      return this.getProperties('list', this.subject, this.paths);
+      return this.getProperties('list', this.subject, this.definition);
     },
     references: function () {
       return this.getReferences(this.properties);
@@ -283,29 +267,24 @@ var List = Vue.extend({
     }
   },
   methods: {
-    referenceText(subject, field, id) {
-      var columns = this.records[subject]['columns'];
-      var records = this.records[subject]['records'];
-      var displayColumn = this.getDisplayColumn(columns);
-      for (var i = 0; i < records.length; i++) {
-        if (records[i][columns.indexOf(field)] == id) {
-          if (displayColumn === false) {
-            return records[i][0];
-          } else {
-            return records[i][displayColumn];
-          }
-        }
-      }
-      return false;
+    referenceText(subject, record) {
+      var properties = this.getProperties('read', subject, this.definition);
+      var displayColumn = this.getDisplayColumn(Object.keys(properties));
+      return record[displayColumn];
+    },
+    referenceId(subject, record) {
+      var properties = this.getProperties('read', subject, this.definition);
+      var primaryKey = this.getPrimaryKey(properties);
+      return record[primaryKey];
     },
     readRecords: function () {
       this.subject = this.$route.params.subject;
       this.records = null;
-      var url = '/' + this.subject;
-      if (this.include) url += '?include=' + this.include;
+      var url = '/records/' + this.subject;
+      if (this.join) url += '?join=' + this.join;
       var self = this;
       api.get(url).then(function (response) {
-        self.records = response.data;
+        self.records = response.data.records;
       }).catch(function (error) {
         console.log(error);
       });
@@ -316,7 +295,7 @@ var List = Vue.extend({
 var View = Vue.extend({
   mixins: [util],
   template: '#view',
-  props: ['paths'],
+  props: ['definition'],
   data: function () {
     return {
       id: this.$route.params.id,
@@ -332,7 +311,7 @@ var View = Vue.extend({
   },
   computed: {
     properties: function () {
-      return this.getProperties('read', this.subject, this.paths);
+      return this.getProperties('read', this.subject, this.definition);
     }
   },
   methods: {
@@ -341,7 +320,7 @@ var View = Vue.extend({
       this.subject = this.$route.params.subject;
       this.record = null;
       var self = this;
-      api.get('/' + this.subject + '/' + this.id).then(function (response) {
+      api.get('/records/' + this.subject + '/' + this.id).then(function (response) {
         self.record = response.data;
       }).catch(function (error) {
         console.log(error);
@@ -352,8 +331,8 @@ var View = Vue.extend({
 
 var Edit = Vue.extend({
   mixins: [util],
-  template: '#edit',
-  props: ['paths'],
+  template: '#update',
+  props: ['definition'],
   data: function () {
     return {
       id: this.$route.params.id,
@@ -367,7 +346,7 @@ var Edit = Vue.extend({
   },
   computed: {
     properties: function () {
-      return this.getProperties('edit', this.subject, this.paths);
+      return this.getProperties('update', this.subject, this.definition);
     },
     primaryKey: function () {
       return this.getPrimaryKey(this.properties);
@@ -386,14 +365,14 @@ var Edit = Vue.extend({
       this.record = null;
       var self = this;
       this.populateOptions();
-      api.get('/' + this.subject + '/' + this.id).then(function (response) {
+      api.get('/records/' + this.subject + '/' + this.id).then(function (response) {
         self.record = response.data;
       }).catch(function (error) {
         console.log(error);
       });
     },
     updateRecord: function () {
-      api.put('/' + this.subject + '/' + this.id, this.record).then(function (response) {
+      api.put('/records/' + this.subject + '/' + this.id, this.record).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
         console.log(error);
@@ -405,14 +384,14 @@ var Edit = Vue.extend({
       var self = this;
       for (var i = 0; i < this.references.length; i++) {
         if (this.references[i] !== false) {
-          var columns = Object.keys(this.getProperties('list', this.references[i][0], this.paths));
+          var columns = Object.keys(this.getProperties('list', this.references[i][0], this.definition));
           var displayColumn = this.getDisplayColumn(columns);
           if (displayColumn) {
             displayColumn = columns[displayColumn];
           } else {
             displayColumn = this.references[i][1];
           }
-          api.get('/' + this.references[i][0] + '?columns=' + this.references[i][1] + ',' + displayColumn).then(function (i, displayColumn, response) {
+          api.get('/records/' + this.references[i][0] + '?columns=' + this.references[i][1] + ',' + displayColumn).then(function (i, displayColumn, response) {
             var subject = Object.keys(response.data)[0];
             var keyIndex = response.data[subject].columns.indexOf(self.references[i][1]);
             var valueIndex = response.data[subject].columns.indexOf(displayColumn);
@@ -438,7 +417,7 @@ var Delete = Vue.extend({
   },
   methods: {
     deleteRecord: function () {
-      api.delete('/' + this.subject + '/' + this.id).then(function (response) {
+      api.delete('/records/' + this.subject + '/' + this.id).then(function (response) {
         console.log(response.data);
       }).catch(function (error) {
         console.log(error);
@@ -450,8 +429,8 @@ var Delete = Vue.extend({
 
 var Add = Vue.extend({
   mixins: [util],
-  template: '#add',
-  props: ['paths'],
+  template: '#create',
+  props: ['definition'],
   data: function () {
     return {
       id: this.$route.params.id,
@@ -464,7 +443,7 @@ var Add = Vue.extend({
   },
   computed: {
     properties: function () {
-      return this.getProperties('add', this.subject, this.paths);
+      return this.getProperties('create', this.subject, this.definition);
     }
   },
   methods: {
@@ -482,7 +461,7 @@ var Add = Vue.extend({
     },
     createRecord: function() {
       var self = this;
-      api.post('/' + this.subject, this.record).then(function (response) {
+      api.post('/records/' + this.subject, this.record).then(function (response) {
         self.record.id = response.data;
       }).catch(function (error) {
         console.log(error);
@@ -496,8 +475,8 @@ var router = new VueRouter({
   linkActiveClass: 'active',
   routes:[
     { path: '/', component: Overview},
-    { path: '/:subject/add', component: Add, name: 'Add'},
-    { path: '/:subject/edit/:id', component: Edit, name: 'Edit'},
+    { path: '/:subject/create', component: Add, name: 'Add'},
+    { path: '/:subject/update/:id', component: Edit, name: 'Edit'},
     { path: '/:subject/delete/:id', component: Delete, name: 'Delete'},
     { path: '/:subject', component: List, name: 'List'},
     { path: '/:subject/:id', component: View, name: 'View'}
@@ -510,12 +489,8 @@ app = new Vue({
   },
   created: function () {
     var self = this;
-    api.post('/',{username:"admin",password:"admin"}).then(function (response) {
-      api.get('').then(function (response) {
-        self.definition = response.data;
-      }).catch(function (error) {
-        console.log(error);
-      });
+    api.get('/openapi').then(function (response) {
+      self.definition = response.data;
     }).catch(function (error) {
       console.log(error);
     });
