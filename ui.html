@@ -73,7 +73,7 @@
           <td v-if="related">
             <template v-for="(relations, i) in referenced">
               <template v-for="(relation, j) in relations">
-                <router-link v-bind:to="{name: 'List', params: {subject: relation.split('.')[0]}}">{{ relation.split('.')[0] }} </router-link>
+                <router-link v-bind:to="{name: 'Filter', params: {subject: relation[0], column: relation[1], id: record[primaryKey]}}">{{ relation[0] }} </router-link>
               </template>
             </template>
           </td>
@@ -192,7 +192,9 @@ var util = {
       var referenced = [];
       for (key in properties) {
         if (properties[key]['x-referenced']) {
-          referenced.push(properties[key]['x-referenced']);
+          for (var i = 0; i < names.length; i++) {
+            referenced.push(properties[key]['x-referenced'].split('.'));
+          }
         }
       }
       return referenced;
@@ -478,8 +480,9 @@ var router = new VueRouter({
     { path: '/:subject/create', component: Add, name: 'Add'},
     { path: '/:subject/update/:id', component: Edit, name: 'Edit'},
     { path: '/:subject/delete/:id', component: Delete, name: 'Delete'},
-    { path: '/:subject', component: List, name: 'List'},
-    { path: '/:subject/:id', component: View, name: 'View'}
+    { path: '/:subject/list', component: List, name: 'List'},
+    { path: '/:subject/filter/:column/:id', component: List, name: 'Filter'},
+    { path: '/:subject/view/:id', component: View, name: 'View'}
   ]
 });
 app = new Vue({
