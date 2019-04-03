@@ -64,7 +64,7 @@
       </thead>
       <tbody>
         <tr v-for="record in records">
-          <template v-for="(value, key, index) in record">
+          <template v-for="(value, key) in record">
             <td v-if="references[key] !== false">
               <router-link v-bind:to="{name: 'View', params: {subject: references[key], id: referenceId(references[key], record[key])}}">{{ referenceText(references[key], record[key]) }}</router-link>
             </td>
@@ -192,8 +192,8 @@ var util = {
       var referenced = [];
       for (key in properties) {
         if (properties[key]['x-referenced']) {
-          for (var i = 0; i < names.length; i++) {
-            referenced.push(properties[key]['x-referenced'].split('.'));
+          for (var i = 0; i < properties[key]['x-referenced'].length; i++) {
+            referenced.push(properties[key]['x-referenced'][i].split('.'));
           }
         }
       }
@@ -283,7 +283,7 @@ var List = Vue.extend({
       this.subject = this.$route.params.subject;
       this.records = null;
       var url = '/records/' + this.subject;
-      if (this.join) url += '?join=' + this.join;
+      if (this.join) url += '?join=' + this.join.join('join=');
       var self = this;
       api.get(url).then(function (response) {
         self.records = response.data.records;
