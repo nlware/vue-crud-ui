@@ -41,7 +41,7 @@
   </div>
 </template>
 
-<template id="overview">
+<template id="home">
 </template>
 
 <template id="list">
@@ -71,10 +71,8 @@
             <td v-else>{{ value }}</td>
           </template>
           <td v-if="related">
-            <template v-for="(relations, i) in referenced">
-              <template v-for="(relation, j) in relations">
-                <router-link v-bind:to="{name: 'Filter', params: {subject: relation[0], column: relation[1], id: record[primaryKey]}}">{{ relation[0] }} </router-link>
-              </template>
+            <template v-for="(relation, i) in referenced">
+              <router-link v-bind:to="{name: 'Filter', params: {subject: relation[0], column: relation[1], id: record[primaryKey]}}">{{ relation[0] }}</router-link>&nbsp;
             </template>
           </td>
           <td>
@@ -122,13 +120,13 @@
     <h2>{{ subject }}: update</h2>
     <p v-if="record===null">Loading...</p>
     <form v-else v-on:submit="updateRecord">
-      <template v-for="(value, key, index) in record">
+      <template v-for="(value, key) in record">
         <div class="form-group">
           <label v-bind:for="key">{{ key }}</label>
-          <input v-if="references[index] === false" class="form-control" v-bind:id="key" v-model="record[key]" :disabled="index === primaryKey" />
+          <input v-if="references[key] === false" class="form-control" v-bind:id="key" v-model="record[key]" :disabled="key === primaryKey" />
           <select v-else class="form-control" v-bind:id="key" v-model="record[key]">
             <option value=""></option>
-            <option v-for="option in options[references[index][0]]" v-bind:value="option.key">{{ option.value }}</option>
+            <option v-for="option in options[references[key]]" v-bind:value="option.key">{{ option.value }}</option>
           </select>
         </div>
       </template>
@@ -170,9 +168,9 @@ var util = {
       }, obj || this);
     },
     getDisplayColumn: function (columns) {
-      var index = null;
+      var index = -1;
       var names = ['name', 'title', 'description', 'username'];
-      for (var i = 0; i < names.length; i++) {
+      for (var i in names) {
         index = columns.indexOf(names[i]);
         if (index >= 0) {
           return names[i];
@@ -181,7 +179,7 @@ var util = {
       return columns[0];
     },
     getPrimaryKey: function (properties) {
-      for (key in properties) {
+      for (var key in properties) {
         if (properties[key]['x-primary-key']) {
           return key;
         }
@@ -190,7 +188,7 @@ var util = {
     },
     getReferenced: function (properties) {
       var referenced = [];
-      for (key in properties) {
+      for (var key in properties) {
         if (properties[key]['x-referenced']) {
           for (var i = 0; i < properties[key]['x-referenced'].length; i++) {
             referenced.push(properties[key]['x-referenced'][i].split('.'));
@@ -201,7 +199,7 @@ var util = {
     },
     getReferences: function (properties) {
       var references = {};
-      for (key in properties) {
+      for (var key in properties) {
         if (properties[key]['x-references']) {
           references[key] = properties[key]['x-references'];
         } else {
@@ -227,9 +225,9 @@ Vue.component('menu-component', {
   props: ['subjects']
 })
 
-var Overview = Vue.extend({
+var Home = Vue.extend({
   mixins: [util],
-  template: '#overview'
+  template: '#home'
 });
 
 var List = Vue.extend({
@@ -253,7 +251,7 @@ var List = Vue.extend({
       return (this.referenced.filter(function (value) { return value; }).length > 0);
     },
     join: function () {
-      return Object.values(this.references).filter(function (value) { return value; }).join();
+      return Object.values(this.references).filter(function (value) { return value; });
     },
     properties: function () {
       return this.getProperties('list', this.subject, this.definition);
@@ -384,23 +382,17 @@ var Edit = Vue.extend({
     populateOptions: function() {
       this.options = {};
       var self = this;
-      for (var i = 0; i < this.references.length; i++) {
-        if (this.references[i] !== false) {
-          var columns = Object.keys(this.getProperties('list', this.references[i][0], this.definition));
-          var displayColumn = this.getDisplayColumn(columns);
-          if (displayColumn) {
-            displayColumn = columns[displayColumn];
-          } else {
-            displayColumn = this.references[i][1];
-          }
-          api.get('/records/' + this.references[i][0] + '?columns=' + this.references[i][1] + ',' + displayColumn).then(function (i, displayColumn, response) {
-            var subject = Object.keys(response.data)[0];
-            var keyIndex = response.data[subject].columns.indexOf(self.references[i][1]);
-            var valueIndex = response.data[subject].columns.indexOf(displayColumn);
-            self.options[subject] = response.data[subject].records.map(function (record) {
-              return {key: record[keyIndex], value: record[valueIndex]};
+      for (var key in this.references) {
+        var subject = this.references[key];
+        if (subject !== false) {
+          var properties = this.getProperties('list', subject, this.definition);
+          var displayColumn = this.getDisplayColumn(Object.keys(properties));
+          var primaryKey = this.getPrimaryKey(properties);
+          api.get('/records/' + subject + '?columns=' + primaryKey + ',' + displayColumn).then(function (subject, primaryKey, displayColumn, response) {
+            self.options[subject] = response.data.records.map(function (record) {
+              return {key: record[primaryKey], value: record[displayColumn]};
             });
-          }.bind(null, i, displayColumn)).catch(function (error) {
+          }.bind(null, subject, primaryKey, displayColumn)).catch(function (error) {
             console.log(error);
           });
         }
@@ -451,7 +443,7 @@ var Add = Vue.extend({
   methods: {
     initRecord: function () {
       this.record = {};
-      for (key in this.properties) {
+      for (var key in this.properties) {
         if (!this.properties[key]['x-primary-key']) {
           if (this.properties[key].default) {
             this.record[key] = this.properties[key].default;
@@ -476,13 +468,13 @@ var Add = Vue.extend({
 var router = new VueRouter({
   linkActiveClass: 'active',
   routes:[
-    { path: '/', component: Overview},
+    { path: '/', component: Home},
     { path: '/:subject/create', component: Add, name: 'Add'},
     { path: '/:subject/update/:id', component: Edit, name: 'Edit'},
     { path: '/:subject/delete/:id', component: Delete, name: 'Delete'},
     { path: '/:subject/list', component: List, name: 'List'},
-    { path: '/:subject/filter/:column/:id', component: List, name: 'Filter'},
-    { path: '/:subject/view/:id', component: View, name: 'View'}
+    { path: '/:subject/list/:column/:id', component: List, name: 'Filter'},
+    { path: '/:subject/read/:id', component: View, name: 'View'},
   ]
 });
 app = new Vue({
