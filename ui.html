@@ -486,6 +486,7 @@ var router = new VueRouter({
     { path: '/:subject/update/:id', component: Edit, name: 'Edit'},
     { path: '/:subject/delete/:id', component: Delete, name: 'Delete'},
     { path: '/:subject/list', component: List, name: 'List'},
+    { path: '/:subject/list/:id', component: List, name: 'FilterView'},
     { path: '/:subject/list/:field/:id', component: List, name: 'Filter'}
   ]
 });
