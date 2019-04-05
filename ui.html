@@ -59,7 +59,7 @@
         <tr>
           <th v-for="value in Object.keys(records[0])">{{ value }}</th>
           <th v-if="related">related</th>
-          <th>actions</th>
+          <th v-if="primaryKey">actions</th>
         </tr>
       </thead>
       <tbody>
@@ -75,7 +75,7 @@
               <router-link v-bind:to="{name: 'Filter', params: {subject: relation[0], column: relation[1], id: record[primaryKey]}}">{{ relation[0] }}</router-link>&nbsp;
             </template>
           </td>
-          <td>
+          <td v-if="primaryKey">
             <router-link class="btn btn-default" v-bind:to="{name: 'View', params: {subject: subject, id: record[primaryKey]}}">View</router-link>
             <router-link class="btn btn-default" v-bind:to="{name: 'Edit', params: {subject: subject, id: record[primaryKey]}}">Edit</router-link>
             <router-link class="btn btn-default" v-bind:to="{name: 'Delete', params: {subject: subject, id: record[primaryKey]}}">Delete</router-link>
@@ -281,7 +281,9 @@ var List = Vue.extend({
       this.subject = this.$route.params.subject;
       this.records = null;
       var url = '/records/' + this.subject;
-      if (this.join) url += '?join=' + this.join.join('join=');
+      if (this.join.length>0) {
+        url += '?join=' + this.join.join('&join=');
+      }
       var self = this;
       api.get(url).then(function (response) {
         self.records = response.data.records;
