@@ -244,10 +244,7 @@ var orm = {
       for (var i=0;i<this.join.length;i++) {
         params.push('join='+this.join[i]);
       }        
-      if (this.id) {
-        if (!this.field) {
-          this.field = this.primaryKey;
-        }
+      if (this.field) {
         params.push('filter='+this.field+',eq,'+this.id);
       }        
       if (params.length>0) {
@@ -486,7 +483,6 @@ var router = new VueRouter({
     { path: '/:subject/update/:id', component: Edit, name: 'Edit'},
     { path: '/:subject/delete/:id', component: Delete, name: 'Delete'},
     { path: '/:subject/list', component: List, name: 'List'},
-    { path: '/:subject/list/:id', component: List, name: 'FilterView'},
     { path: '/:subject/list/:field/:id', component: List, name: 'Filter'}
   ]
 });
