@@ -8,8 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-router/3.0.2/vue-router.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.js"></script>
-  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
-  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap-theme.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
 </head>
 <body>
 
@@ -32,12 +31,10 @@
 </div>
 
 <template id="menu">
-  <div>
-    <ul v-if="subjects!==null" class="nav nav-pills nav-stacked">
-      <router-link v-for="subject in subjects" tag="li" v-bind:to="{name: 'List', params: {subject: subject.name}}">
-        <a>{{ subject.name }}</a>
+  <div v-if="subjects!==null" class="nav flex-column nav-pills">
+      <router-link v-for="subject in subjects" v-bind:to="{name: 'List', params: {subject: subject.name}}" class="nav-link">
+        {{ subject.name }}
       </router-link>
-    </ul
   </div>
 </template>
 
@@ -48,10 +45,11 @@
   <div>
     <h2>{{ subject }}: list</h2>
     <div class="actions">
-      <router-link class="btn btn-default" v-bind:to="{name: 'Add', params: {subject: subject}}">
-        <span class="glyphicon glyphicon-plus"></span>
-        Add
-      </router-link>
+      <p>
+        <router-link class="btn btn-primary" v-bind:to="{name: 'Add', params: {subject: subject}}">
+          Add
+        </router-link>
+      </p>
     </div>
     <p v-if="records===null">Loading...</p>
     <table v-else class="table">
@@ -75,11 +73,11 @@
               <router-link v-bind:to="{name: 'Filter', params: {subject: relation[0], column: relation[1], id: record[primaryKey]}}">{{ relation[0] }}</router-link>&nbsp;
             </template>
           </td>
-          <td v-if="primaryKey">
-            <router-link class="btn btn-default" v-bind:to="{name: 'View', params: {subject: subject, id: record[primaryKey]}}">View</router-link>
-            <router-link class="btn btn-default" v-bind:to="{name: 'Edit', params: {subject: subject, id: record[primaryKey]}}">Edit</router-link>
-            <router-link class="btn btn-default" v-bind:to="{name: 'Delete', params: {subject: subject, id: record[primaryKey]}}">Delete</router-link>
-         </td>
+          <td v-if="primaryKey" style="padding: .5em; white-space: nowrap;">
+            <router-link class="btn btn-secondary btn-sm" v-bind:to="{name: 'View', params: {subject: subject, id: record[primaryKey]}}">View</router-link>
+            <router-link class="btn btn-secondary btn-sm" v-bind:to="{name: 'Edit', params: {subject: subject, id: record[primaryKey]}}">Edit</router-link>
+            <router-link class="btn btn-danger btn-sm" v-bind:to="{name: 'Delete', params: {subject: subject, id: record[primaryKey]}}">Delete</router-link>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -97,7 +95,7 @@
         </div>
       </template>
       <button type="submit" class="btn btn-primary">Create</button>
-      <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
+      <router-link class="btn btn-primary" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
   </div>
 </template>
@@ -131,7 +129,7 @@
         </div>
       </template>
       <button type="submit" class="btn btn-primary">Save</button>
-      <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
+      <router-link class="btn btn-secondary" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
   </div>
 </template>
@@ -142,7 +140,7 @@
     <form v-on:submit="deleteRecord">
       <p>The action cannot be undone.</p>
       <button type="submit" class="btn btn-danger">Delete</button>
-      <router-link class="btn btn-default" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
+      <router-link class="btn btn-secondary" v-bind:to="{name: 'List', params: {subject: subject}}">Cancel</router-link>
     </form>
   </div>
 </template>
