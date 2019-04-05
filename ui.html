@@ -244,7 +244,10 @@ var orm = {
       for (var i=0;i<this.join.length;i++) {
         params.push('join='+this.join[i]);
       }        
-      if (this.field) {
+      if (this.id) {
+        if (!this.field) {
+          this.field = this.primaryKey;
+        }
         params.push('filter='+this.field+',eq,'+this.id);
       }        
       if (params.length>0) {
