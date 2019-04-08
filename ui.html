@@ -129,6 +129,9 @@
         <div class="form-group">
           <label v-bind:for="key">{{ key }}</label>
           <input v-if="references[key] === false" class="form-control" v-bind:id="key" v-model="record[key]" :disabled="key === primaryKey" />
+          <select v-else-if="!options[references[key]]" class="form-control" disabled>
+            <option value="" selected>Loading...</option>
+          </select>
           <select v-else class="form-control" v-bind:id="key" v-model="record[key]">
             <option value=""></option>
             <option v-for="option in options[references[key]]" v-bind:value="option.key">{{ option.value }}</option>
@@ -271,6 +274,7 @@ var orm = {
             self.options[subject] = response.data.records.map(function (record) {
               return {key: record[primaryKey], value: record[displayColumn]};
             });
+            self.$forceUpdate();
           }.bind(null, subject, primaryKey, displayColumn)).catch(function (error) {
             console.log(error);
           });
